@@ -1,5 +1,5 @@
 CXX = g++
-Variable = -std=c++11
+Variable = -std=c++11 -g
 
 compact_compare: compact_compare.o
 	$(CXX) $(Variable) -o compact_compare compact_compare.o

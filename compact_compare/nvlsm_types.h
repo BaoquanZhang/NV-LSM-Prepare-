@@ -12,9 +12,7 @@ namespace nv_lsm{
         public:
             long start;
             long end;
-            int size;
             vector< pair<long, string> > kvArray;
-            Run * next[2];
     };
 
     class Level {
@@ -24,3 +22,5 @@ namespace nv_lsm{
     };
 
 };
+
+
