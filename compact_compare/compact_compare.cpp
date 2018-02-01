@@ -21,7 +21,6 @@ void init(Level & level, int num) {
         for (i = 0; i < 3; i++) {
             Run run;
             run.array_count = 1;
-            run.next.reserve(MAX_ARRAY - 1);
             run.kvArray.reserve(RUN_SIZE);
             run.start = 0;
             for (j = 0; j < RUN_SIZE * 10; j+= 10) {
@@ -36,7 +35,6 @@ void init(Level & level, int num) {
         for (i = 0; i < 10; i++) {
             Run run;
             run.array_count = 1;
-            run.next.reserve(MAX_ARRAY - 1);
             run.kvArray.reserve(RUN_SIZE);
             run.start = i * RUN_SIZE;
             for (j = i * RUN_SIZE; j < RUN_SIZE * (i + 1); j++) {
@@ -65,17 +63,19 @@ void outputArray(vector< pair<long, string> > kvArray, int count) {
 
 void split_write(vector<pair<long, string> > & buffer, Level & level) {
     int count = 0;
-    while (count + RUN_SIZE <= buffer.size()) {
-        level.runs.emplace(level.runs.end());
+    while (count < buffer.size()) {
+        int end1 = count + RUN_SIZE;
+        int end2 = buffer.size();
+        int copy_end = end1 <= end2 ? end1: end2;
+        level.runs.emplace_back();
         auto last_run = &(level.runs.back());
         level.run_count++;
         last_run->kvArray.reserve(RUN_SIZE);
-        last_run->kvArray.insert(last_run->kvArray.begin(), buffer.begin() + count, buffer.begin() + count + RUN_SIZE);
+        last_run->kvArray.insert(last_run->kvArray.begin(), buffer.begin() + count, buffer.begin() + copy_end);
         last_run->start = last_run->kvArray.front().first;
         last_run->end = last_run->kvArray.back().first;
         count += RUN_SIZE;
     }
-
 }
 
 /* This is the function for normal compaction */
@@ -100,65 +100,70 @@ void norm_compact(Level & level0, Level & level1) {
         sort(buffer.begin(), buffer.end(), comparePair);
 
         /* split and write back to level1 */
-        int erase_start = 0;
-        int erase_end = level1.runs.size();
+        int end_count = level1.runs.size();
         split_write(buffer, level1);
         level0.runs.erase(level0.runs.begin());
         level0.run_count--;
-        level1.runs.erase(level1.runs.begin() + erase_start, level1.runs.begin() + erase_end);
-        level1.run_count -= erase_end - erase_start - 1;
+        while (end_count-- > 0) {
+            level1.runs.erase(level1.runs.begin());
+        }
+        level1.run_count -= end_count;
         //checkRuns(level0);
         //checkRuns(level1);
     }
 }
 
 /* This is the function for lazy compaction */
+
 void lazy_compact(Level & level0, Level & level1) { 
     auto l0_it = level0.runs.begin();
+    auto l1_stop = level1.runs.end();
     while (l0_it != level0.runs.end()) {
         int offset = 0;
         int start = 0;
         auto l1_it = level1.runs.begin();
-        auto l1_stop = level1.runs.end();
-        while (l1_it != level1.runs.end()) {
-            while (offset < l0_it->kvArray.size() && l0_it->kvArray[offset] <= l1_it.end()) {
+        while (l1_it != l1_stop) {
+            while (offset < l0_it->kvArray.size() && l0_it->kvArray[offset].first <= l1_it->end) {
                 offset++;
             }
-            if (l1_it->array_count <= MAX_ARRAY) {
-                /* add segment to run */
-                pair<int, int> range(start, offset - 1);
-                pair<Run *, pair<int, int> > nextSeg(l0_it, range);    
-                l1_it->next.insert(nextSeg);
-                l1.it->array_count++;
+            if (offset > start && l1_it->array_count < MAX_ARRAY) {
+                l1_it->next.emplace_back(l0_it, start, offset);
+                l1_it->start = l1_it->start < l0_it->kvArray[start].first ? l1_it->start : l0_it->kvArray[start].first;
+                l1_it->end = l1_it->end > l0_it->kvArray[offset - 1].first ? l1_it->end : l0_it->kvArray[offset - 1].first; 
+                l1_it->array_count++;
                 l0_it->ref_count++;
+                cout << l1_it->next.back().start << " " << l1_it->next.back().end << endl; 
+                l1_it++;
             } else {
                 int total = offset - start - 1;
                 total += l1_it->kvArray.size();
                 for (auto next_it = l1_it->next.begin(); next_it != l1_it->next.end(); next_it++) {
-                    total += next_it->second.second - next_it->second.first + 1;
+                    total += next_it->end - next_it->start + 1;
                 }
+
+                /* allocate buffer and copy data from level0, level1 run and level1 run-seg */
                 vector<pair<long, string>> buffer(total);
-                buffer.insert(buffer.begin() + buffer.size(), l0_it.kvArray.begin() + start, l0_it->kvArray.begin() + offset);
+                buffer.insert(buffer.begin() + buffer.size(), l0_it->kvArray.begin() + start, l0_it->kvArray.begin() + offset);
+                buffer.insert(buffer.begin() + buffer.size(), l1_it->kvArray.begin(), l1_it->kvArray.end());
                 for (auto next_it = l1_it->next.begin(); next_it != l1_it->next.end(); next_it++) {
-                    auto seg_it = next_it->first;
-                    int seg_start = next_it->second.first;
-                    int seg_end = next_it->second.second;
-                    auto seg_start_it = seg_it->kvArray.begin() + seg_start;
-                    auto seg_end_it = seg_it->kvArray.begin() + seg_end;
-                    buffer.insert(buffer.begin() + buffer.size(), seg_start_it, seg_end_it);
+                    auto array_begin = next_it->run_it->kvArray.begin();
+                    int seg_start = next_it->start;
+                    int seg_end = next_it->start;
+                    buffer.insert(buffer.begin() + buffer.size(), array_begin + seg_start , array_begin + seg_end);
                 } 
                 sort(buffer.begin(), buffer.end(), comparePair);
                 split_write(buffer, level1);
-                level1.erase(l1_it);
+                level1.runs.erase(l1_it);
                 l0_it->ref_count--;
                 if (l0_it->ref_count == 0) {
-                    level0.erase(l0_it);
+                    level0.runs.erase(l0_it);
                 }
+                l1_it = level1.runs.begin();
             }
-            l0_it = level0.runs.begin();
-            l1_it = level1.runs.begin();
             start = offset;
         }
+        checkRuns(level0);
+        checkRuns(level1);
     }
 }
 
@@ -183,7 +188,8 @@ int main(void) {
     checkRuns(level1);
 
     high_resolution_clock::time_point t1 = high_resolution_clock::now();
-    norm_compact(level0, level1);
+    //norm_compact(level0, level1);
+    lazy_compact(level0, level1);
     high_resolution_clock::time_point t2 = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>( t2 - t1 ).count();
     cout << "Time used by normal compaction: " << duration << endl;
