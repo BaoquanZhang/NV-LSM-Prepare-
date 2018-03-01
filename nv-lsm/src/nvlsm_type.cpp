@@ -1,4 +1,4 @@
-#include "include/nvlsm_type.h"
+#include "../include/nvlsm_types.h"
 
 using namespace std;
 using namespace nv_lsm;
@@ -19,18 +19,23 @@ void PlsmStore::put(string key, string value) {
         memTable->buffer = new vector< pair<string, string> >();
         memTable->buffer->reserve(RUN_SIZE);
     }
+    
+    /* put kv pair into memory buffer */
+    memTable->buffer->insert(memTable->buffer->end(), make_pair(key, value));
 
     int len = memTable->buffer->size();
 
-    if (len < RUN_SIZE) {
-        /* put kv pair into memory buffer */
-    } else {
+    if (len == RUN_SIZE) {
         /* put memory buffer into persist queue 
          * and allocate new buffer */
+        memTable->persist_queue.insert(memTable->persist_queue.end(), memTable->buffer);
+        memTable->buffer = new vector< pair<string, string> >();
+        memTable->buffer->reserve(RUN_SIZE);
     }
+    return;
 }
 
-void PlsmStore::persist_memTable(MemTable * memTable, Level * level0) {
+void PlsmStore::persist_memTable(MemTable * memTable, list<Level *> levels) {
 
 }
 
@@ -44,6 +49,12 @@ void PlsmStore::normal_compaction(Level * up_level, Level * bottom_level) {
 }
 
 void PlsmStore::lazy_compaction(Level * up_level, Level * bottom_level) {
+}
+
+/* Implementations for MemTable */
+MemTable::MemTable() {}
+MemTable::~MemTable() {
+    delete(buffer);
 }
 
 /* Implementations for Level */ 

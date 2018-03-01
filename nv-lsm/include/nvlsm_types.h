@@ -4,6 +4,7 @@
 #include<vector>
 #include<list>
 #include<utility>
+#include<string>
 
 using namespace std;
 
@@ -26,9 +27,9 @@ namespace nv_lsm{
             MemTable * memTable;
             
             /* internal operations */
-            void persist_memTable(MemTable* memTable, Level * level);
-            void normal_compaction(level * up_level, Level * bottom_level);
-            void lazy_compaction(level * up_level, Level * bottom_level);
+            void persist_memTable(MemTable* memTable, list<Level *> levels);
+            void normal_compaction(Level * up_level, Level * bottom_level);
+            void lazy_compaction(Level * up_level, Level * bottom_level);
 
             /* interface */
             void put(string key, string value);
@@ -43,7 +44,9 @@ namespace nv_lsm{
         public:
             vector< pair<string, string> > * buffer;
             list< vector< pair<string, string> > * > persist_queue;
-    }
+            MemTable();
+            ~MemTable();
+    };
 
     class Seg {
         public:
@@ -52,6 +55,7 @@ namespace nv_lsm{
             int end;
 
             Seg(list<Run>::iterator old_run, int old_start, int old_end);
+            ~Seg();
     };
 
     class Run {
@@ -64,6 +68,7 @@ namespace nv_lsm{
             list<Seg> next;
 
             Run();
+            ~Run();
     };
 
     class Level {
