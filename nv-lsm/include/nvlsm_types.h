@@ -10,8 +10,9 @@ using namespace std;
 
 #define RUN_SIZE 4096
 #define MAX_ARRAY 3
+#define LAYOUT "plsmStore"
 
-namespace nv_lsm{
+namespace nv_lsm {
     
     class PlsmStore;
     class Run;
@@ -23,7 +24,7 @@ namespace nv_lsm{
         public:
             int level_base;
             int level_ratio;
-            list<Level *> levels;
+            list<Level> levels;
             MemTable * memTable;
             
             /* internal operations */
@@ -34,7 +35,7 @@ namespace nv_lsm{
             /* interface */
             void put(string key, string value);
             string get(string key);
-            vector< pair<string, string> > range(string start, string end);
+            vector< pair<string, string> > range(string start_key, string end_key);
 
             PlsmStore(int level_base_val, int level_ratio_val);
             ~PlsmStore();

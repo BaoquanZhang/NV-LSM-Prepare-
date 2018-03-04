@@ -14,7 +14,7 @@ PlsmStore::PlsmStore(int level_base_val, int level_ratio_val) {
 PlsmStore::~PlsmStore(){}
 
 /* insert a key value pair to memory buffer */
-void PlsmStore::put(string key, string value) {
+void PlsmStore::put(string key, string  value) {
     if (memTable->buffer == NULL) {
         memTable->buffer = new vector< pair<string, string> >();
         memTable->buffer->reserve(RUN_SIZE);
@@ -36,7 +36,7 @@ void PlsmStore::put(string key, string value) {
 }
 
 void PlsmStore::persist_memTable(MemTable * memTable, list<Level *> levels) {
-
+    
 }
 
 string PlsmStore::get(string key) {
