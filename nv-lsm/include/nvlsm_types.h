@@ -5,6 +5,7 @@
 #include<list>
 #include<utility>
 #include<string>
+#include <pthread.h>
 
 using namespace std;
 
@@ -21,16 +22,19 @@ namespace nv_lsm {
     class MemTable;
 
     class PlsmStore {
-        public:
-            int level_base;
-            int level_ratio;
-            list<Level> levels;
-            MemTable * memTable;
-            
+        private:
+            pthread_t persist_thread_id;
             /* internal operations */
-            void persist_memTable(MemTable* memTable, list<Level *> levels);
             void normal_compaction(Level * up_level, Level * bottom_level);
             void lazy_compaction(Level * up_level, Level * bottom_level);
+            static bool compare(pair<string, string> kv1, pair<string, string> kv2);
+
+        public:
+            bool start_persist;
+            int level_base;
+            int level_ratio;
+            vector<Level> levels;
+            MemTable * memTable;
 
             /* interface */
             void put(string key, string value);
@@ -61,14 +65,15 @@ namespace nv_lsm {
 
     class Run {
         public:
-            long start;
-            long end;
+            string start;
+            string  end;
             int array_count;
             int ref_count;
             vector< pair<string, string> > kvArray;
             list<Seg> next;
 
             Run();
+            Run(vector< pair<string, string> > * array);
             ~Run();
     };
 

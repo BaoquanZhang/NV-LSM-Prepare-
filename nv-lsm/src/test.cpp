@@ -17,9 +17,9 @@ int main(void) {
     }
     cout << endl;
 
-    cout << "Display persist queue " << endl;
-    for (auto queue_it : pstore.memTable->persist_queue) {
-        for (auto it = queue_it->begin(); it != queue_it->end(); it++) {
+    cout << "Display level 0 " << endl;
+    for (auto run_it : pstore.levels[0].runs) {
+        for (auto it = run_it.kvArray.begin(); it != run_it.kvArray.end(); it++) {
             cout << "<" << it->first << "," << it->second << "> ";
         }
 
