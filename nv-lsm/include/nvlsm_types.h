@@ -1,12 +1,14 @@
 #ifndef _NVLSM_TYPE_H_
 #define _NVLSM_TYPE_H_
 
-#include<vector>
-#include<list>
+#include <vector>
+#include <list>
 #include <unistd.h>
-#include<utility>
-#include<string>
+#include <utility>
+#include <string>
 #include <pthread.h>
+#include "mem_structure.h"
+#include "global_conf.h"
 /* pmdk headers */
 #include <libpmemobj++/persistent_ptr.hpp>
 #include <libpmemobj++/pool.hpp>
@@ -19,20 +21,12 @@ using namespace std;
 /* pmdk namespace */
 using namespace pmem::obj;
 
-#define RUN_SIZE 4096
-#define MAX_ARRAY 3
-#define LAYOUT "plsmStore"
-#define KEY_SIZE 16
-#define VALUE_SIZE 128
-#define LEVEL_NUM 3
-
 namespace nv_lsm {
     
     class PlsmStore;
     class Run;
     class Level;
     class Seg;
-    class MemTable;
 
     struct LSM_Root {                                       // persistent root object
         persistent_ptr<Level> head;                         // head of the vector of levels
@@ -55,11 +49,10 @@ namespace nv_lsm {
             bool start_persist;
             p<int> level_base;
             p<int> level_ratio;
-            p<int> level_num;
             persistent_ptr<Level> level_head;
             persistent_ptr<Level> level_tail;
             MemTable * memTable;
-
+            MetaTable * metaTable;
             /* interface */
             void put(string key, string value);
             string get(string key);
@@ -69,18 +62,12 @@ namespace nv_lsm {
             ~PlsmStore();
     };
 
-    /* Data structure in DRAM only */
-    class MemTable {
-        public:
-            vector< pair<string, string> > * buffer;
-            list< vector< pair<string, string> > * > persist_queue;
-            MemTable();
-            ~MemTable();
-    };
 
     /* Data structure in pmem */
     class Level {
         public:
+            
+            MetaTable * metaTable;
             p<int> level_id;
             p<int> run_count;
             persistent_ptr<Run> run_head;
