@@ -25,31 +25,31 @@ void * persist_memTable(void * virtual_p)
 {
     PlsmStore * plsmStore = (PlsmStore *) virtual_p;
     auto persist_queue = &(plsmStore->memTable->persist_queue);
+    auto level0 = plsmStore->level_head;
+    auto p_level0_range = &(plsmStore->metaTable->level_range[0]);
     LOG("Persist thread start");
     while(true) {
         g_start_persist_mutex.lock();
-        if (!plsmStore->start_persist && persist_queue->empty())
-            break;
-        g_start_persist_mutex.unlock();
-        
-        /* Do nothing if queue is empty */
-        if (persist_queue->empty())
-            continue;
-        /* start to copy data */
-        if (!persist_queue->empty() && plsmStore->level_head == NULL) {
-            /* Create Level 0 */
-            make_persistent_atomic<Level>(pmpool, plsmStore->level_head, 0);
-            plsmStore->level_tail = plsmStore->level_head;
+        if (persist_queue->empty()) {
+            if (!plsmStore->start_persist) {
+                /* break out if start_persist is false */
+                g_start_persist_mutex.unlock();
+                break;
+            } else {
+                /* Do nothing if queue is empty */
+                g_start_persist_mutex.unlock();
+                continue;
+            }
         }
-        /* Create a new run at the end of Level 0 */
+        g_start_persist_mutex.unlock();
+        /* start to copy data
+         * 1. Create a new run at the end of Level 0 
+         * 2. copy kvs into new run 
+         * */
         LOG("persist thread copying kv pairs");
-        auto level0 = plsmStore->level_head;
         g_persist_list_mutex.lock();
         auto p_queue_range = &(plsmStore->metaTable->queue_range);
-        auto p_level0_range = &(plsmStore->metaTable->level_range[0]);
-        string current_start = p_queue_range->front()->start_key;
-        string current_end = p_queue_range->front()->end_key;
-        LOG("Persisting key range <" + current_start + "," + current_end + ">");
+        LOG("Persisting <" + p_queue_range->front()->start_key + "," + p_queue_range->front()->end_key + ">");
         if (level0->run_head == NULL) {
             make_persistent_atomic<Run>(pmpool, level0->run_head, persist_queue->front());
             level0->run_tail = level0->run_head;
@@ -93,6 +93,9 @@ PlsmStore::PlsmStore (const string& path, const size_t size, int level_base_val,
         pmsize = (size_t) st.st_size;
     }
     LOG("Create/open pool done");
+    /* Create Level 0 */
+    make_persistent_atomic<Level>(pmpool, level_head, 0);
+    level_tail = level_head;
     /* Start persist thread for copy kv pairs from memtable to persistent levels */
     g_start_persist_mutex.lock();
     start_persist = true;
